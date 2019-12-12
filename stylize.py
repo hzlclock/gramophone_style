@@ -109,17 +109,18 @@ musica=smooth(musica, window_len=10)
 
 
 state=0.0
-epsilon=0.05
-slicelen=100
-rang=0.05
+epsilon=0.01
+slicelen=200
+rang=0.4
 offset=np.zeros(math.ceil(musica.shape[0]/slicelen)*slicelen)
 for i in range(0, offset.shape[0]):
-#     state+=random.uniform(
-#         rang*(-epsilon-state*epsilon),
-#         rang*(epsilon-state*epsilon))
     state+=random.uniform(
-        rang*-epsilon, rang*epsilon)
+        (-epsilon-state*epsilon),
+        (epsilon-state*epsilon))
+#     state+=random.uniform(
+#         rang*-epsilon, rang*epsilon)
     offset[i]=state
+offset*=rang
 offset=np.power(2, offset)
 
 
@@ -136,9 +137,11 @@ smusica=np.pad(musica, (0, tail)).reshape(-1, slicelen)
 pos=0
 for idx, i in enumerate(tqdm.tqdm(smusica)):
     badslice=resize(i, (int(slicelen*offset[idx]),1), anti_aliasing=True)
+    badslice=np.trim_zeros(badslice)
     bmusica_array[pos:pos+badslice.shape[0]]+=badslice
     pos+=badslice.shape[0]
 
+print("SAVE", sys.argv[1]+'.bad.wav')
 librosa.output.write_wav(sys.argv[1]+'.bad.wav', np.trim_zeros(bmusica_array), sr)
 
 
