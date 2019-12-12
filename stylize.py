@@ -2,7 +2,7 @@
 # coding: utf-8
 
 import librosa
-import librosa.display
+# import librosa.display
 import numpy as np
 import scipy
 import tqdm
@@ -11,6 +11,7 @@ import math
 import random
 import numba
 import sys
+import cv2
 from skimage.transform import resize
 
 
@@ -74,8 +75,8 @@ def obstacle(length):
 
 
 musica, sr = librosa.load(sys.argv[1], sr=44100)
-musica=smooth(musica, window_len=10)
-
+musica=smooth(musica, window_len=8)
+librosa.output.write_wav(sys.argv[1]+'.smooth.wav', musica, sr)
 
 # In[91]:
 
@@ -109,10 +110,10 @@ musica=smooth(musica, window_len=10)
 
 
 state=0.0
-epsilon=0.01
-slicelen=200
-rang=0.4
-offset=np.zeros(math.ceil(musica.shape[0]/slicelen)*slicelen)
+epsilon=0.05
+slicelen=100
+rang=0.2
+offset=np.zeros(math.ceil(musica.shape[0]/slicelen))
 for i in range(0, offset.shape[0]):
     state+=random.uniform(
         (-epsilon-state*epsilon),
@@ -120,8 +121,10 @@ for i in range(0, offset.shape[0]):
 #     state+=random.uniform(
 #         rang*-epsilon, rang*epsilon)
     offset[i]=state
+
 offset*=rang
 offset=np.power(2, offset)
+print(np.max(offset), np.min(offset))
 
 
 
@@ -131,17 +134,35 @@ tail
 
 
 bmusica_array=np.zeros((int(musica.shape[0]*2),1))
-print(bmusica_array.shape)
-smusica=np.pad(musica, (0, tail)).reshape(-1, slicelen)
+# print(bmusica_array.shape)
+
+smusica=np.pad(musica, (0, tail), mode='constant')
 # badmusica=[]
 pos=0
-for idx, i in enumerate(tqdm.tqdm(smusica)):
-    badslice=resize(i, (int(slicelen*offset[idx]),1), anti_aliasing=True)
-    badslice=np.trim_zeros(badslice)
+pos_musica=0
+# bmusica_array=[]
+for idx, i in enumerate(tqdm.trange(math.ceil(musica.shape[0]/slicelen))):
+    # badslice=np.array(resize(smusica[pos_musica: pos_musica+slicelen],
+    #      (int(slicelen*0.95),1), anti_aliasing=False), copy=True)
+    orig=smusica[pos_musica: pos_musica+slicelen].reshape(1,-1)
+    # print(orig.shape)
+    # print(pos_musica/sr, pos/sr, np.max(orig), np.min(orig))
+    badslice=cv2.resize(orig,(int(slicelen*offset[i]),1))
+    badslice=badslice.reshape(-1,1)
+    # print(badslice.shape)
+    # badslice=np.trim_zeros(badslice)
+    # if badslice.shape[0] != 1900:
+    #     print(badslice.shape[0])
+    
+    pos_musica+=slicelen
     bmusica_array[pos:pos+badslice.shape[0]]+=badslice
     pos+=badslice.shape[0]
-
+    # bmusica_array.append(badslice)
+bmusica_array=np.asarray(bmusica_array)
+bmusica_array=bmusica_array.ravel()
+print(bmusica_array.shape)
 print("SAVE", sys.argv[1]+'.bad.wav')
+# np.trim_zeros(bmusica_array)
 librosa.output.write_wav(sys.argv[1]+'.bad.wav', np.trim_zeros(bmusica_array), sr)
 
 
