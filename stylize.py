@@ -13,6 +13,7 @@ import numba
 import sys
 import cv2
 from skimage.transform import resize
+import os
 
 
 def smooth(x,window_len=11,window='hanning'):
@@ -75,8 +76,8 @@ def obstacle(length):
 
 
 musica, sr = librosa.load(sys.argv[1], sr=44100)
-musica=smooth(musica, window_len=8)
-librosa.output.write_wav(sys.argv[1]+'.smooth.wav', musica, sr)
+musica=smooth(musica, window_len=6)
+# librosa.output.write_wav(sys.argv[1]+'.smooth.wav', musica, sr)
 
 # In[91]:
 
@@ -110,9 +111,9 @@ librosa.output.write_wav(sys.argv[1]+'.smooth.wav', musica, sr)
 
 
 state=0.0
-epsilon=0.05
-slicelen=100
-rang=0.2
+epsilon=0.03
+slicelen=1000
+rang=0.10
 offset=np.zeros(math.ceil(musica.shape[0]/slicelen))
 for i in range(0, offset.shape[0]):
     state+=random.uniform(
@@ -124,6 +125,7 @@ for i in range(0, offset.shape[0]):
 
 offset*=rang
 offset=np.power(2, offset)
+offset*=0.98
 print(np.max(offset), np.min(offset))
 
 
@@ -147,7 +149,7 @@ for idx, i in enumerate(tqdm.trange(math.ceil(musica.shape[0]/slicelen))):
     orig=smusica[pos_musica: pos_musica+slicelen].reshape(1,-1)
     # print(orig.shape)
     # print(pos_musica/sr, pos/sr, np.max(orig), np.min(orig))
-    badslice=cv2.resize(orig,(int(slicelen*offset[i]),1))
+    badslice=np.array(cv2.resize(orig,(int(slicelen*offset[i]),1)), copy=True)
     badslice=badslice.reshape(-1,1)
     # print(badslice.shape)
     # badslice=np.trim_zeros(badslice)
@@ -163,6 +165,7 @@ bmusica_array=bmusica_array.ravel()
 print(bmusica_array.shape)
 print("SAVE", sys.argv[1]+'.bad.wav')
 # np.trim_zeros(bmusica_array)
-librosa.output.write_wav(sys.argv[1]+'.bad.wav', np.trim_zeros(bmusica_array), sr)
+os.makedirs("bad", exist_ok=True)
+librosa.output.write_wav('bad/'+sys.argv[1]+'.bad.wav', np.trim_zeros(bmusica_array), sr)
 
 
