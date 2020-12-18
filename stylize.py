@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import librosa
+import soundfile as sf
 # import librosa.display
 import numpy as np
 import scipy
@@ -163,9 +164,9 @@ for idx, i in enumerate(tqdm.trange(math.ceil(musica.shape[0]/slicelen))):
 bmusica_array=np.asarray(bmusica_array)
 bmusica_array=bmusica_array.ravel()
 print(bmusica_array.shape)
-print("SAVE", sys.argv[1]+'.bad.wav')
+print("SAVE", sys.argv[1]+'.bad.flac')
 # np.trim_zeros(bmusica_array)
 os.makedirs("bad", exist_ok=True)
-librosa.output.write_wav('bad/'+sys.argv[1]+'.bad.wav', np.trim_zeros(bmusica_array), sr)
+sf.write('bad/'+sys.argv[1]+'.bad.flac', np.trim_zeros(bmusica_array), sr)
 
 
