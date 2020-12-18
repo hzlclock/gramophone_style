@@ -17,6 +17,28 @@ from skimage.transform import resize
 import os
 
 
+epsilon=0.12 #random pitch mod range
+slicelen=1000 #random pitch mod interval
+rang=0.10   
+pitch_mod_global=0.97 #overall pitch modulation
+smooth_window=4
+
+from pysndfx import AudioEffectsChain
+
+fx = (
+    AudioEffectsChain()
+    .equalizer(20,  db=-12.0)
+    .equalizer(40,  db=-9.0)
+    .equalizer(80,  db=-6.0)
+    .equalizer(120, db=-4.0)
+    .equalizer(200, db=-2.0)
+    # .equalizer(500, db=3.0)
+    # .equalizer(1000,db=3.0)
+    # .equalizer(1600,db=3.0)
+    # .equalizer(3000,db=3.0)
+)
+
+
 def smooth(x,window_len=11,window='hanning'):
     """smooth the data using a window with requested size.
     
@@ -72,49 +94,39 @@ def obstacle(length):
 #     print(length, samples.shape)
     return samples
 
+def ensure_dir(file_path):
+    directory = os.path.dirname(file_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-# In[90]:
+def addobstacle(h,l1,l2,xpos,track):
+    l1i=int(l1)
+    l2i=int(l2)
+    offset_o=np.zeros(l1i+l2i)
+    # k1=float(h)/l1
+    k1=-float(h)/(l1*l1)
+    for i in range(-l1i,0):
+        offset_o[l1i+i]=k1*i*i+h
 
+    k2=-float(h)/(l2*l2)
+    for i in range(0,l2i):
+        offset_o[l1i+i]=k2*i*i+h
 
-musica, sr = librosa.load(sys.argv[1], sr=44100)
-musica=smooth(musica, window_len=6)
-# librosa.output.write_wav(sys.argv[1]+'.smooth.wav', musica, sr)
+    assert(xpos+l1i+l2i<track.shape[0])
+    try:
+        track[xpos: xpos+l1i+l2i]+=offset_o
+    except:
+        print(track.shape, xpos, xpos+l1i+l2i)
 
-# In[91]:
-
-
-# mask=np.random.rand(musica.shape[0]+100)
-
-
-# In[92]:
-
-
-# ob_st_freq=200
-# ob_end_freq=10000
-
-# minlen=int(sr/ob_end_freq)
-# maxlen=int(sr/ob_st_freq)
-# for i in tqdm.trange(0, 20000):
-#     pos=random.randint(2*maxlen, musica.shape[0]-2*maxlen)
-#     le=random.randint(minlen, maxlen)
-#     obs=obstacle(le)
-# #     print(obs.shape)
-#     mask[pos:pos+le]+=obs
-    
-# mask=smooth(mask, window_len=80)
-
-# mask*=0.02
-# musica+=mask[0:musica.shape[0]]
+    return track
 
 
-# librosa.output.write_wav('gen.wav', musica, sr)
-# librosa.output.write_wav('mask.wav', mask, sr)
-
+musica, sr = librosa.load(sys.argv[1])
+musica=smooth(musica, window_len=smooth_window)
+musica=fx(musica)
 
 state=0.0
-epsilon=0.03
-slicelen=1000
-rang=0.10
+
 offset=np.zeros(math.ceil(musica.shape[0]/slicelen))
 for i in range(0, offset.shape[0]):
     state+=random.uniform(
@@ -126,7 +138,7 @@ for i in range(0, offset.shape[0]):
 
 offset*=rang
 offset=np.power(2, offset)
-offset*=0.98
+offset*=pitch_mod_global
 print(np.max(offset), np.min(offset))
 
 
@@ -163,10 +175,27 @@ for idx, i in enumerate(tqdm.trange(math.ceil(musica.shape[0]/slicelen))):
     # bmusica_array.append(badslice)
 bmusica_array=np.asarray(bmusica_array)
 bmusica_array=bmusica_array.ravel()
+bmusica_array=np.trim_zeros(bmusica_array)
 print(bmusica_array.shape)
-print("SAVE", sys.argv[1]+'.bad.flac')
+
+for i in range(0,int(len(bmusica_array)/500)):
+    bmusica_array=addobstacle(random.uniform(0.001, 0.03),\
+                             random.uniform(20,1000),\
+                             random.uniform(20,2000),\
+                             int(random.random()*(len(bmusica_array)-4000)), bmusica_array)
+
+for i in range(0,int(len(bmusica_array)/10000)):
+    bmusica_array=addobstacle(random.uniform(0.1, 0.5),\
+                             random.uniform(20,1000),\
+                             random.uniform(20,2000),\
+                             int(random.random()*(len(bmusica_array)-4000)), bmusica_array)
+
+
+print(bmusica_array.shape)
+print("SAVE", sys.argv[1]+'.bad')
 # np.trim_zeros(bmusica_array)
 os.makedirs("bad", exist_ok=True)
-sf.write('bad/'+sys.argv[1]+'.bad.flac', np.trim_zeros(bmusica_array), sr)
+ensure_dir('bad/'+sys.argv[1]+'.bad.flac')
+sf.write('bad/'+sys.argv[1]+'.bad.flac', bmusica_array, sr)
 
 
